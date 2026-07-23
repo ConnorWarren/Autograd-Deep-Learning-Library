@@ -2,7 +2,6 @@ import struct
 import numpy as np
 import numpy.typing as npt
 from nn import NeuralNetwork
-from functions import cel_prime
 
 def parse_mnist(images_path: str, labels_path: str) \
     -> tuple[npt.NDArray[np.int8], npt.NDArray[np.int8]]:
@@ -19,14 +18,13 @@ def parse_mnist(images_path: str, labels_path: str) \
 
     return img_matrix, label_arr
 
-def train(model: NeuralNetwork, images, labels) -> None:
-    epochs = 2
+def train(model: NeuralNetwork, images, labels, epochs: int) -> None:
     for epoch in range(epochs):
         print(f"Training epoch: {epoch}")
         for image, label in zip(images, labels):
             prediction = model.forward(image)
             expected_arr = np.array([1 if n == label else 0 for n in range(10)])
-            model.backward(expected_arr, prediction)
+            model.backward(prediction, expected_arr)
 
 def test(model: NeuralNetwork, images, labels) -> None:
     total_correct = 0
@@ -47,7 +45,7 @@ def main() -> None:
         "train-images.idx3-ubyte",
         "train-labels.idx1-ubyte"
     )
-    train(model, images, labels)
+    train(model, images, labels, 2)
 
     test_images, test_labels = parse_mnist(
         "t10k-images.idx3-ubyte",
