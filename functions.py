@@ -11,16 +11,7 @@ def softmax(x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
     exp = np.exp(x)
     return exp / np.sum(exp)
 
-def softmax_prime(x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
-    exp = np.exp(x)
-    return (np.sum(exp) * exp - exp * np.sum(exp)) / (exp/np.sum(exp))**2
-
 def cross_entropy_loss(
         expected: npt.NDArray[np.float64], actual: npt.NDArray[np.float64]
     ) -> np.float64:
     return -np.sum(expected * np.log(actual))
-
-def cel_prime(
-        expected, actual
-) -> np.float64:
-    return -np.sum(expected / actual)
