@@ -23,14 +23,17 @@ def parse_mnist(images_path: str, labels_path: str) \
     return img_matrix, label_arr
 
 def train(model: NeuralNetwork, images, labels, epochs: int, plot_loss=True) -> None:
-    batch_size = 256
+    batch_size = len(images) // 100
+    rng = np.random.default_rng()
     for epoch in range(epochs):
         print(f"Training epoch: {epoch}")
-        batch = np.random.choice(len(images), size=batch_size, replace=False)
-        raw_predictions = model.forward(images[batch])
-        expected = np.zeros((batch_size, 10))
-        expected[range(batch_size), labels[batch]] = 1
-        model.backward(raw_predictions, expected)
+        for i in range(len(images) // batch_size):
+            indices = rng.permutation(len(images))
+            batch_indices = indices[i*batch_size:(i+1)*batch_size]
+            raw_predictions = model.forward(images[batch_indices])
+            expected = np.zeros((batch_size, 10))
+            expected[range(batch_size), labels[batch_indices]] = 1
+            model.backward(raw_predictions, expected)
 
 def test(model: NeuralNetwork, images, labels) -> None:
     total_correct = 0
@@ -45,13 +48,12 @@ def test(model: NeuralNetwork, images, labels) -> None:
     print(f"Accuracy: {total_correct/(total_correct + total_incorrect) * 100}%")
 
 def main() -> None:    
-    model = NeuralNetwork()
-    
+    model = NeuralNetwork() 
     images, labels = parse_mnist(
         "train-images.idx3-ubyte",
         "train-labels.idx1-ubyte"
     )
-    train(model, images, labels, 5000, plot_loss=False)
+    train(model, images, labels, 50, plot_loss=False)
 
     test_images, test_labels = parse_mnist(
         "t10k-images.idx3-ubyte",
