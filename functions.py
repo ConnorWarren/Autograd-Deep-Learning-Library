@@ -8,8 +8,9 @@ def relu_prime(x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
     return np.where(x < 0, 0, 1)
 
 def softmax(x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+    x = x - np.max(x, axis=1, keepdims=True) # shift for numerical stability
     exp = np.exp(x)
-    return exp / np.sum(exp)
+    return exp / np.sum(exp, axis=1, keepdims=True)
 
 def cross_entropy_loss(
         expected: npt.NDArray[np.float64], actual: npt.NDArray[np.float64]
