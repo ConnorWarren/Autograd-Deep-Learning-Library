@@ -45,7 +45,9 @@ class NeuralNetwork:
         if self.input_layer is None or not all([layer.cache for layer in self.layers]):
             raise Exception("Run forward pass before calling backward")
 
-        dZ_3 = prediction - label
+        batch_size = self.input_layer.shape[0]
+
+        dZ_3 = (prediction - label) / batch_size
         dW_3 = dZ_3.T @ self.layers[1].cache.a # type: ignore
 
         dZ_2 = dZ_3 @ self.layers[2].weights * relu_prime(self.layers[1].cache.z)
@@ -54,8 +56,10 @@ class NeuralNetwork:
         dZ_1 = dZ_2 @ self.layers[1].weights * relu_prime(self.layers[0].cache.z)
         dW_1 = dZ_1.T @ self.input_layer
 
-        batch_size = self.input_layer.shape[0]
+        self.layers[2].weights -= self.lr * dW_3 
+        self.layers[1].weights -= self.lr * dW_2  
+        self.layers[0].weights -= self.lr * dW_1  
 
-        self.layers[2].weights -= self.lr * dW_3 / batch_size
-        self.layers[1].weights -= self.lr * dW_2 / batch_size
-        self.layers[0].weights -= self.lr * dW_1 / batch_size
+        self.layers[2].biases -= self.lr * np.sum(dZ_3, axis=0)
+        self.layers[1].biases -= self.lr * np.sum(dZ_2, axis=0)
+        self.layers[0].biases -= self.lr * np.sum(dZ_1, axis=0)
