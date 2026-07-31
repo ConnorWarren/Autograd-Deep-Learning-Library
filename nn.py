@@ -56,10 +56,25 @@ class NeuralNetwork:
         dZ_1 = dZ_2 @ self.layers[1].weights * relu_prime(self.layers[0].cache.z)
         dW_1 = dZ_1.T @ self.input_layer
 
-        self.layers[2].weights -= self.lr * dW_3 
-        self.layers[1].weights -= self.lr * dW_2  
-        self.layers[0].weights -= self.lr * dW_1  
+        self.layers[2].weights -= self.lr * dW_3
+        self.layers[1].weights -= self.lr * dW_2
+        self.layers[0].weights -= self.lr * dW_1
 
         self.layers[2].biases -= self.lr * np.sum(dZ_3, axis=0)
         self.layers[1].biases -= self.lr * np.sum(dZ_2, axis=0)
         self.layers[0].biases -= self.lr * np.sum(dZ_1, axis=0)
+
+    def save(self, path: str) -> None:
+        layer_data = {}
+        for i, layer in enumerate(self.layers):
+            layer_data[f"W_{i}"] = layer.weights
+            layer_data[f"b_{i}"] = layer.biases
+
+        np.savez_compressed(path, **layer_data)
+
+    def load(self, path: str) -> None:
+        with np.load(path) as data:
+            for i, layer in enumerate(self.layers):
+                layer.weights = data[f"W_{i}"]
+                layer.biases = data[f"b_{i}"]
+ 
