@@ -1,46 +1,70 @@
 import numpy as np
 import numpy.typing as npt
-from dataclasses import dataclass
+from abc import ABC, abstractmethod
 
-from functions import relu, relu_prime, softmax, cross_entropy_loss
+from tensor import Tensor
+from functions import relu, relu_prime
 
-@dataclass
-class LayerCache:
-    z: npt.NDArray[np.float64]
-    a: npt.NDArray[np.float64]
-
-class Layer:
-    def __init__(self, in_size: int, out_size: int, activation_func) -> None:
+class Layer(ABC):
+    def __init__(self, in_size: int, out_size: int, use_params: bool = True) -> None:
         self.cache = None
         self.in_size = in_size
         self.out_size = out_size
-        self.activation_func = activation_func
-        self.weights = np.random.randn(out_size, in_size) * 0.01
-        self.biases = np.random.randn(out_size) * 0.01
 
-    def forward(self, x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
-        z = x @ self.weights.T + self.biases
-        a = self.activation_func(z)
-        self.cache = LayerCache(z, a)
+        if use_params:
+            self.weights = np.random.randn(out_size, in_size) * 0.01
+            self.biases = np.random.randn(out_size) * 0.01
+
+        self.use_params = use_params
+
+    @abstractmethod
+    def forward(self, x: Tensor) -> Tensor:
+        ...
+
+    def backward(self) -> Tensor:
+        ...
+
+class Linear(Layer):
+    def __init__(self, in_size: int, out_size: int) -> None:
+        super().__init__(in_size, out_size)
+
+    def forward(self, x: Tensor) -> Tensor:
+        z = x @ Tensor(self.weights.T) + Tensor(self.biases)
+        self.cache = z
+        return z
+
+class ReLU(Layer):
+    def __init__(self, in_size: int) -> None:
+        super().__init__(in_size, in_size, False)
+
+    def forward(self, x: Tensor) -> Tensor:
+        a = Tensor(relu(x.array))
+        self.cache = a
         return a
+
+    def backward(self) -> Tensor:
+        return Tensor(relu_prime(self.cache.array))
 
 class NeuralNetwork:
     def __init__(self) -> None:
         self.lr = .1
         self.layers = [
-            Layer(28*28, 128, relu),
-            Layer(128, 64, relu),
-            Layer(64, 10, softmax)
+            Linear(28*28, 128),
+            ReLU(128),
+            Linear(128, 64),
+            ReLU(64),
+            Linear(64, 10)
         ]
         self.input_layer = None
 
-    def forward(self, x) -> npt.NDArray[np.float64]:
+    def forward(self, x) -> Tensor:
+        x = Tensor(x)
         self.input_layer = x
         for layer in self.layers:
             x = layer.forward(x)
 
         return x
-
+    """
     def backward(self, prediction, label):
         if self.input_layer is None or not all([layer.cache for layer in self.layers]):
             raise Exception("Run forward pass before calling backward")
@@ -63,7 +87,7 @@ class NeuralNetwork:
         self.layers[2].biases -= self.lr * np.sum(dZ_3, axis=0)
         self.layers[1].biases -= self.lr * np.sum(dZ_2, axis=0)
         self.layers[0].biases -= self.lr * np.sum(dZ_1, axis=0)
-
+    """
     def save(self, path: str) -> None:
         layer_data = {}
         for i, layer in enumerate(self.layers):
