@@ -2,41 +2,58 @@ import numpy as np
 import numpy.typing as npt
 
 class Tensor:
-    def __init__(self, array: npt.NDArray, inputs = None):
+    def __init__(self, array: npt.NDArray, inputs: tuple[Tensor, ...] = (), label=""):
         self.array = array
         self.inputs = inputs
         self.gradient = np.zeros(self.array.shape)
+        self.backward = None
+        self.label = label
+
+    def __repr__(self):
+        return f"{self.label}"
 
     def __add__(self, other: "Tensor") -> "Tensor":
         output = Tensor(self.array + other.array, (self, other))
 
         def backward():
-            self.gradient += 1
-            other.gradient += 1
+            self.gradient += output.gradient
+            other.gradient += output.gradient
 
-        self.backward = backward
+        output.backward = backward
 
         return output
 
     def __mul__(self, other: "Tensor"):
-        result = Tensor(self.array * other.array, (self, other))
+        output = Tensor(self.array * other.array, (self, other))
 
         def backward():
-            temp = self.gradient
-            self.gradient += other.gradient
-            other.gradient += temp
+            self.gradient += output.gradient * other.array
+            other.gradient += output.gradient * self.array
 
-        self.backward = backward
+        output.backward = backward
 
-        return result
+        return output
 
     def __matmul__(self, other: "Tensor"):
-        return Tensor(self.array @ other.array, (self, other))
+        output = Tensor(self.array @ other.array, (self, other))
+    
+    def sum(self) -> "Tensor":
+        output = Tensor(self.array.sum(), inputs=(self,))
 
-    def zero_gradients(self):
-        ...
+        def backward():
+            self.gradient = np.ones_like(self.array)
+
+        output.backward = backward
+        return output
+
+    def zero_gradients(self) -> None:
+        """Zero all gradients in the computational graph."""
+        self.gradient = 0
+        for tensor in self.inputs:
+            tensor.zero_gradients()
 
     def topological_sort(self) -> list["Tensor"]:
+        """Generate a valid toplogical ordering of the computational graph"""
         order = []
         visited = set()
         stack = [(self, True), (self, False)]
@@ -54,6 +71,11 @@ class Tensor:
 
         return order
 
-    def backward(self) -> None:
-        for tensor in reversed(self.topological_sort()):
-            tensor.gradient = tensor.backward()
+    def backward_all(self) -> None:
+        if self.array.size != 1:
+            raise Exception("Backward can only be called on a scalar value")
+        self.gradient = 1
+        for tensor in reversed(self.topological_sort()[1:]):
+            if tensor.backward is None:
+                continue
+            tensor.backward()
