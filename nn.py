@@ -2,18 +2,18 @@ import numpy as np
 import numpy.typing as npt
 from abc import ABC, abstractmethod
 
-from tensor import Tensor
-from functions import relu, relu_prime
+from tensor import Tensor, Parameter
 
 class Layer(ABC):
     def __init__(self, in_size: int, out_size: int, use_params: bool = True) -> None:
-        self.cache = None
         self.in_size = in_size
         self.out_size = out_size
+        self.weights = Parameter()
+        self.biases = Parameter()
 
         if use_params:
-            self.weights = np.random.randn(out_size, in_size) * 0.01
-            self.biases = np.random.randn(out_size) * 0.01
+            self.weights = Parameter(np.random.randn(out_size, in_size) * 0.01, label="W")
+            self.biases = Parameter(np.random.randn(out_size) * 0.01, label="b")
 
         self.use_params = use_params
 
@@ -23,31 +23,27 @@ class Layer(ABC):
 
     def backward(self) -> Tensor:
         ...
+    
+    def parameters(self) -> tuple[Parameter | None, ...]:
+        return self.weights, self.biases
 
 class Linear(Layer):
     def __init__(self, in_size: int, out_size: int) -> None:
         super().__init__(in_size, out_size)
 
     def forward(self, x: Tensor) -> Tensor:
-        z = x @ Tensor(self.weights.T) + Tensor(self.biases)
-        self.cache = z
+        z = x @ self.weights.transpose() + self.biases
         return z
 
 class ReLU(Layer):
     def __init__(self, in_size: int) -> None:
-        super().__init__(in_size, in_size, False)
+        super().__init__(in_size, in_size, use_params=False)
 
     def forward(self, x: Tensor) -> Tensor:
-        a = Tensor(relu(x.array))
-        self.cache = a
-        return a
-
-    def backward(self) -> Tensor:
-        return Tensor(relu_prime(self.cache.array))
+        return x.relu()
 
 class NeuralNetwork:
     def __init__(self) -> None:
-        self.lr = .1
         self.layers = [
             Linear(28*28, 128),
             ReLU(128),
@@ -88,17 +84,25 @@ class NeuralNetwork:
         self.layers[1].biases -= self.lr * np.sum(dZ_2, axis=0)
         self.layers[0].biases -= self.lr * np.sum(dZ_1, axis=0)
     """
+
+    def parameters(self):
+        """Return a list of all parameters in the network"""
+        return [param for layer in self.layers for param in layer.parameters()]
+
     def save(self, path: str) -> None:
         layer_data = {}
         for i, layer in enumerate(self.layers):
-            layer_data[f"W_{i}"] = layer.weights
-            layer_data[f"b_{i}"] = layer.biases
+            if not layer.use_params:
+                continue
+            layer_data[f"W_{i}"] = layer.weights.array
+            layer_data[f"b_{i}"] = layer.biases.array
 
         np.savez_compressed(path, **layer_data)
 
     def load(self, path: str) -> None:
         with np.load(path) as data:
             for i, layer in enumerate(self.layers):
-                layer.weights = data[f"W_{i}"]
-                layer.biases = data[f"b_{i}"]
- 
+                if not layer.use_params:
+                    continue
+                layer.weights = Parameter(data[f"W_{i}"])
+                layer.biases = Parameter(data[f"b_{i}"])
