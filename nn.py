@@ -42,48 +42,13 @@ class ReLU(Layer):
     def forward(self, x: Tensor) -> Tensor:
         return x.relu()
 
-class NeuralNetwork:
-    def __init__(self) -> None:
-        self.layers = [
-            Linear(28*28, 128),
-            ReLU(128),
-            Linear(128, 64),
-            ReLU(64),
-            Linear(64, 10)
-        ]
-        self.input_layer = None
+class Model(ABC):
+    def __init__(self, *layers):
+        self.layers = layers
 
+    @abstractmethod
     def forward(self, x) -> Tensor:
-        x = Tensor(x)
-        self.input_layer = x
-        for layer in self.layers:
-            x = layer.forward(x)
-
-        return x
-    """
-    def backward(self, prediction, label):
-        if self.input_layer is None or not all([layer.cache for layer in self.layers]):
-            raise Exception("Run forward pass before calling backward")
-
-        batch_size = self.input_layer.shape[0]
-
-        dZ_3 = (prediction - label) / batch_size
-        dW_3 = dZ_3.T @ self.layers[1].cache.a # type: ignore
-
-        dZ_2 = dZ_3 @ self.layers[2].weights * relu_prime(self.layers[1].cache.z)
-        dW_2 = dZ_2.T @ self.layers[0].cache.a #type: ignore
-
-        dZ_1 = dZ_2 @ self.layers[1].weights * relu_prime(self.layers[0].cache.z)
-        dW_1 = dZ_1.T @ self.input_layer
-
-        self.layers[2].weights -= self.lr * dW_3
-        self.layers[1].weights -= self.lr * dW_2
-        self.layers[0].weights -= self.lr * dW_1
-
-        self.layers[2].biases -= self.lr * np.sum(dZ_3, axis=0)
-        self.layers[1].biases -= self.lr * np.sum(dZ_2, axis=0)
-        self.layers[0].biases -= self.lr * np.sum(dZ_1, axis=0)
-    """
+        ...
 
     def parameters(self):
         """Return a list of all parameters in the network"""
@@ -106,3 +71,14 @@ class NeuralNetwork:
                     continue
                 layer.weights = Parameter(data[f"W_{i}"])
                 layer.biases = Parameter(data[f"b_{i}"])
+
+class Sequential(Model):
+    def __init__(self, *layers):
+        self.layers = layers
+        super().__init__(*self.layers)
+
+    def forward(self, x) -> Tensor:
+        x = Tensor(x, label="x")
+        for layer in self.layers:
+            x = layer.forward(x)
+        return x
