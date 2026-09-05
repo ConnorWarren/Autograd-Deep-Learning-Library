@@ -57,6 +57,8 @@ class Tensor:
     def gradient(self, new_grad: npt.NDArray):
         if new_grad.shape != self.array.shape:
             raise Exception(f"Gradient shape {new_grad.shape} does not match tensor shape {self.array.shape}")
+
+        self._gradient = new_grad
     
     def zero_gradient(self) -> None:
         self.gradient = np.zeros_like(self.array)
@@ -74,7 +76,7 @@ class Tensor:
         output = Tensor(relu(self.array), inputs=(self, ))
 
         def backward():
-            self.gradient += relu_prime(self.array)
+            self.gradient += output.gradient * relu_prime(self.array)
         
         output.backward = backward
 
