@@ -1,11 +1,13 @@
 import argparse
-import matplotlib
-import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 import struct
 
 from nn import NeuralNetwork
+from tensor import Tensor
+from loss import cel_softmax
+from functions import softmax
+from optimizer import SGD
 
 def parse_mnist(images_path: str, labels_path: str) \
     -> tuple[npt.NDArray[np.float64], npt.NDArray[np.uint8]]:
@@ -25,21 +27,27 @@ def parse_mnist(images_path: str, labels_path: str) \
 def train(model: NeuralNetwork, images, labels, epochs: int, plot_loss=True) -> None:
     batch_size = len(images) // 100
     rng = np.random.default_rng()
+    optim = SGD(model.parameters(), .1, batch_size)
     for epoch in range(epochs):
         print(f"Training epoch: {epoch}")
         indices = rng.permutation(len(images))
         for i in range(len(images) // batch_size):
+            optim.zero_gradients()
             batch_indices = indices[i*batch_size:(i+1)*batch_size]
             raw_predictions = model.forward(images[batch_indices])
             expected = np.zeros((batch_size, 10))
             expected[range(batch_size), labels[batch_indices]] = 1
-            model.backward(raw_predictions, expected)
+            loss = cel_softmax(Tensor(expected), raw_predictions)
+            loss.backward_all()
+            optim.step()
 
 def test(model: NeuralNetwork, images, labels) -> None:
     total_correct = 0
     total_incorrect = 0
     for image, label in zip(images, labels):
-        prediction = np.argmax(model.forward(image[np.newaxis, :]))
+        logits = model.forward(image[np.newaxis, :]).array
+        probs = softmax(logits)
+        prediction = np.argmax(probs)
         if prediction == label:
             total_correct += 1
         else:
@@ -68,7 +76,7 @@ def main() -> None:
             "train-images.idx3-ubyte",
             "train-labels.idx1-ubyte"
         )
-        train(model, images, labels, args.epochs, plot_loss=False)
+        train(model, images, labels, args.epochs, plot_loss=args.plot)
         model.save(args.path)
 
     if args.test:
