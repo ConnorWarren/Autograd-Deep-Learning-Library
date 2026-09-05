@@ -3,7 +3,7 @@ import numpy as np
 import numpy.typing as npt
 import struct
 
-from nn import NeuralNetwork
+import nn
 from tensor import Tensor
 from loss import cel_softmax
 from functions import softmax
@@ -24,7 +24,7 @@ def parse_mnist(images_path: str, labels_path: str) \
 
     return img_matrix, label_arr
 
-def train(model: NeuralNetwork, images, labels, epochs: int, plot_loss=True) -> None:
+def train(model: nn.Model, images, labels, epochs: int, plot_loss=True) -> None:
     batch_size = len(images) // 100
     rng = np.random.default_rng()
     optim = SGD(model.parameters(), .1, batch_size)
@@ -41,7 +41,7 @@ def train(model: NeuralNetwork, images, labels, epochs: int, plot_loss=True) -> 
             loss.backward_all()
             optim.step()
 
-def test(model: NeuralNetwork, images, labels) -> None:
+def test(model: nn.Model, images, labels) -> None:
     total_correct = 0
     total_incorrect = 0
     for image, label in zip(images, labels):
@@ -66,7 +66,13 @@ def main() -> None:
     parser.add_argument("--epochs", type=int, default=20, help="Number of training epochs")
     args = parser.parse_args()
 
-    model = NeuralNetwork()
+    model = nn.Sequential(
+        nn.Linear(28*28, 128),
+        nn.ReLU(128),
+        nn.Linear(128, 64),
+        nn.ReLU(64),
+        nn.Linear(64, 10)
+    )
 
     if args.load:
         model.load(args.path)
