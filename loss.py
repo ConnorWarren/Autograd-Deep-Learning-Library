@@ -7,7 +7,7 @@ def cel_softmax(expected: Tensor, predicted: Tensor) -> Tensor:
     probs = softmax(predicted.array)
     output = Tensor(
         np.array(cross_entropy_loss(expected.array, probs)),
-        inputs=(expected, predicted)
+        inputs=(expected, Tensor(probs, inputs=(predicted,)))
     )
     def backward():
         predicted.gradient = predicted.array - expected.array
