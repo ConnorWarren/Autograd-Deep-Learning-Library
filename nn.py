@@ -1,46 +1,66 @@
 import numpy as np
 import numpy.typing as npt
-from dataclasses import dataclass
+from abc import ABC, abstractmethod
 
-from functions import relu, relu_prime, softmax, cross_entropy_loss
+from tensor import Tensor, Parameter
 
-@dataclass
-class LayerCache:
-    z: npt.NDArray[np.float64]
-    a: npt.NDArray[np.float64]
-
-class Layer:
-    def __init__(self, in_size: int, out_size: int, activation_func) -> None:
-        self.cache = None
+class Layer(ABC):
+    def __init__(self, in_size: int, out_size: int, use_params: bool = True) -> None:
         self.in_size = in_size
         self.out_size = out_size
-        self.activation_func = activation_func
-        self.weights = np.random.randn(out_size, in_size) * 0.01
-        self.biases = np.random.randn(out_size) * 0.01
+        self.weights = Parameter()
+        self.biases = Parameter()
 
-    def forward(self, x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
-        z = x @ self.weights.T + self.biases
-        a = self.activation_func(z)
-        self.cache = LayerCache(z, a)
-        return a
+        if use_params:
+            self.weights = Parameter(np.random.randn(out_size, in_size) * 0.01, label="W")
+            self.biases = Parameter(np.random.randn(out_size) * 0.01, label="b")
+
+        self.use_params = use_params
+
+    @abstractmethod
+    def forward(self, x: Tensor) -> Tensor:
+        ...
+
+    def backward(self) -> Tensor:
+        ...
+    
+    def parameters(self) -> tuple[Parameter | None, ...]:
+        return self.weights, self.biases
+
+class Linear(Layer):
+    def __init__(self, in_size: int, out_size: int) -> None:
+        super().__init__(in_size, out_size)
+
+    def forward(self, x: Tensor) -> Tensor:
+        z = x @ self.weights.transpose() + self.biases
+        return z
+
+class ReLU(Layer):
+    def __init__(self, in_size: int) -> None:
+        super().__init__(in_size, in_size, use_params=False)
+
+    def forward(self, x: Tensor) -> Tensor:
+        return x.relu()
 
 class NeuralNetwork:
     def __init__(self) -> None:
-        self.lr = .1
         self.layers = [
-            Layer(28*28, 128, relu),
-            Layer(128, 64, relu),
-            Layer(64, 10, softmax)
+            Linear(28*28, 128),
+            ReLU(128),
+            Linear(128, 64),
+            ReLU(64),
+            Linear(64, 10)
         ]
         self.input_layer = None
 
-    def forward(self, x) -> npt.NDArray[np.float64]:
+    def forward(self, x) -> Tensor:
+        x = Tensor(x)
         self.input_layer = x
         for layer in self.layers:
             x = layer.forward(x)
 
         return x
-
+    """
     def backward(self, prediction, label):
         if self.input_layer is None or not all([layer.cache for layer in self.layers]):
             raise Exception("Run forward pass before calling backward")
@@ -63,18 +83,26 @@ class NeuralNetwork:
         self.layers[2].biases -= self.lr * np.sum(dZ_3, axis=0)
         self.layers[1].biases -= self.lr * np.sum(dZ_2, axis=0)
         self.layers[0].biases -= self.lr * np.sum(dZ_1, axis=0)
+    """
+
+    def parameters(self):
+        """Return a list of all parameters in the network"""
+        return [param for layer in self.layers for param in layer.parameters()]
 
     def save(self, path: str) -> None:
         layer_data = {}
         for i, layer in enumerate(self.layers):
-            layer_data[f"W_{i}"] = layer.weights
-            layer_data[f"b_{i}"] = layer.biases
+            if not layer.use_params:
+                continue
+            layer_data[f"W_{i}"] = layer.weights.array
+            layer_data[f"b_{i}"] = layer.biases.array
 
         np.savez_compressed(path, **layer_data)
 
     def load(self, path: str) -> None:
         with np.load(path) as data:
             for i, layer in enumerate(self.layers):
-                layer.weights = data[f"W_{i}"]
-                layer.biases = data[f"b_{i}"]
- 
+                if not layer.use_params:
+                    continue
+                layer.weights = Parameter(data[f"W_{i}"])
+                layer.biases = Parameter(data[f"b_{i}"])
